@@ -1,27 +1,22 @@
-from vllm import LLM, SamplingParams
+import bm25s
 
 
 def main():
 
-    prompts = [
-        "Hello, my name is",
-        "The president of the United States is",
-        "The capital of France is",
-        "The future of AI is",
-    ]
+    corpus: list[str] = []    
+    metadatas_chunks: list[tuple[str, int, int]] = []
 
-    llm = LLM(model='Qwen/Qwen3-0.6B')
-    sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
-    outputs = llm.generate(prompts, sampling_params)
-    for output in outputs:
-        print('output: ', output)
-        prompt = output.prompt
-        generated_text = output.outputs[0].text
-        print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
+    retriever = bm25s.BM25()
+    corpus_tokens = bm25s.tokenize(corpus)
+    retriever.index(corpus_tokens)
+    query = "What are the default values for FP8_MIN and FP8_MAX constants in vLLM's triton_flash_attention module?"
+    query_tokens = bm25s.tokenize(query)
+    docs, scores = retriever.retrieve(query_tokens, k=2)
+    print(f"Best result (score: {scores[0, 0]:.2f}): {docs[0, 0]}")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    # try:
+    main()
+    # except Exception as e:
+    #     print(e)
