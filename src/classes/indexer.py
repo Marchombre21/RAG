@@ -1,6 +1,7 @@
 import os
 from ast import parse, FunctionDef, ClassDef, get_source_segment
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from pydantic import BaseModel, Field, PrivateAttr
 
 
@@ -10,8 +11,9 @@ class Indexer(BaseModel):
     __chunk: str = PrivateAttr("")
     __text_splitter: RecursiveCharacterTextSplitter = PrivateAttr()
     chunk_size: int = Field(2000, le=2000)
-    corpus: list[str]
-    metadatas_chunks: list[tuple[str, int, int]]
+    __corpus: list[str] = PrivateAttr(default_factory=list)
+    __metadatas_chunks: list[tuple[str, int, int]] =\
+        PrivateAttr(default_factory=list)
 
     def init_splitter(self) -> None:
         self.__text_splitter = RecursiveCharacterTextSplitter(
@@ -31,6 +33,22 @@ class Indexer(BaseModel):
         self.__start_id = new_start
 
     @property
+    def corpus(self) -> int:
+        return self.__corpus
+
+    @corpus.setter
+    def corpus(self, new_start: int):
+        self.__corpus = new_start
+
+    @property
+    def metadatas_chunks(self) -> int:
+        return self.__metadatas_chunks
+
+    @metadatas_chunks.setter
+    def metadatas_chunks(self, new_start: int):
+        self.__metadatas_chunks = new_start
+
+    @property
     def end_id(self) -> int:
         return self.__end_id
 
@@ -46,59 +64,71 @@ class Indexer(BaseModel):
     def chunk(self, new_chunk: int):
         self.__chunk = new_chunk
 
-    def add_chunk(self, file_content: str, index: tuple[int, int]):
-        start: int
-        end: int
-        start, end = index
-        self.corpus.append(file_content[start:end])
+    # def add_chunk(self, file_content: str, index: tuple[int, int]):
+    #     start: int
+    #     end: int
+    #     start, end = index
+    #     self.corpus.append(file_content[start:end])
 
     def split_text(self, file_content: str, file: str):
-        texts: list[str] = self.text_splitter.create_documents([file_content])
-        for n in range(len(texts) - 2):
-            self.end_id = self.start_id + len(texts[n])
-            self.metadatas_chunks.append((file, self.start_id, self.end_id - 1))
-            self.add_chunk(file_content, (self.start_id, self.end_id))
+        if self.start_id == -1:
+            self.start_id = 0
+        texts: list[Document] = self.text_splitter.\
+            create_documents([file_content])
+        offset: int = 1 if len(texts[-1].page_content) == self.chunk_size\
+            else 0
+
+        for n in range(len(texts) - (2 - offset)):
+            self.end_id = self.start_id + len(texts[n].page_content)
+            self.metadatas_chunks.append((file, self.start_id,
+                                          self.end_id - 1))
+            # self.add_chunk(file_content, (self.start_id, self.end_id))
+            self.corpus.append(file_content[self.start_id:self.end_id])
             self.start_id = self.end_id
-        if len(texts[-1]) == self.chunk_size:
-            self.end_id = self.start_id + self.chunk_size
-            self.metadatas_chunks.append((file, self.start_id, self.end_id - 1))
-            self.add_chunk(file_content, (self.start_id, self.end_id))
-            self.start_id = -1
+
+        if not offset:
+            self.end_id = self.start_id + len(texts[-1].page_content)
         else:
-            self.chunk = texts[-1]
-            self.end_id = self.start_id + len(texts[n])
+            self.start_id = -1
 
     def parse_py(self, file_content: str, file: str) -> None:
         try:
             file_tree = parse(file_content)
+            for node in file_tree.body:
+                if isinstance(node, ClassDef) or isinstance(node, FunctionDef):
+                    if self.start_id != -1:
+                        self.metadatas_chunks.append(
+                            (file, self.start_id, self.end_id - 1)
+                        )
+                        self.corpus.append(file_content[self.start_id:
+                                                        self.end_id])
+
+                    self.chunk = get_source_segment(file_content, node)
+                    self.start_id = file_content.find(self.chunk)
+                    self.end_id = self.start_id + len(self.chunk)
+                    self.metadatas_chunks.append((file, self.start_id,
+                                                  self.end_id))
+                    self.corpus.append(self.chunk)
+                    self.start_id = -1
+
+                else:
+                    self.chunk = get_source_segment(file_content, node)
+                    if self.start_id == -1:
+                        self.start_id = file_content.find(self.chunk)
+                    self.end_id = file_content.find(self.chunk, self.start_id)\
+                        + len(self.chunk)
+                    if (self.end_id - self.start_id) > self.chunk_size:
+                        self.split_text(file_content[self.start_id:
+                                                     self.end_id], file)
+                    if self.end_id == len(file_content):
+                        self.metadatas_chunks.append(
+                            (file, self.start_id, self.end_id - 1)
+                        )
+                        self.corpus.append(file_content[self.start_id:
+                                                        self.end_id])
+
         except SyntaxError:
-
-        for node in file_tree.body:
-            if isinstance(node, ClassDef) or\
-                    isinstance(node, FunctionDef):
-                if start_id != -1:
-                    self.metadatas_chunks.append((file, start_id, end_id - 1))
-                    self.add_chunk(file_content, (start_id, end_id))
-
-                chunk = get_source_segment(file_content, node)
-                start_id = file_content.find(chunk)
-                end_id = start_id + len(chunk)
-                self.metadatas_chunks.append((file, start_id, end_id))
-                self.corpus.append(chunk)
-                start_id = -1
-
-            else:
-                chunk = get_source_segment(file_content, node)
-                if start_id == -1:
-                    start_id = file_content.find(chunk)
-                end_id = file_content.find(chunk, start_id) +\
-                    len(chunk)
-                if (end_id - start_id) > self.chunk_size:
-                    self.split_text(file_content[start_id:end_id])
-                if end_id == len(file_content):
-                    self.metadatas_chunks.append((file, start_id, end_id - 1))
-                    self.add_chunk(file_content, (start_id, end_id))
-
+            self.split_text(file_content, file)
 
     def read_all_files(self) -> None:
 
@@ -107,9 +137,12 @@ class Indexer(BaseModel):
             # print('dirs', dirs)
             # print('files', files)
             for file in files:
-                if file.endswith(".py") or file.endswith(".md") or\
-                        file.endswith(".txt"):
-                    with open(root + '/' + file, "r") as f:
+                if (
+                    file.endswith(".py")
+                    or file.endswith(".md")
+                    or file.endswith(".txt")
+                ):
+                    with open(root + "/" + file, "r") as f:
                         file_content: str = f.read()
                     if file.endswith(".py"):
-                        
+                        self.parse_py(file_content, root + "/" + file)
