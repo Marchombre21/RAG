@@ -140,6 +140,7 @@ class Indexer(BaseModel):
                         self.corpus.append(file_content[self.start_id:
                                                         self.end_id])
         except SyntaxError:
+            print(file)
             self.split_text(file_content, file)
 
     def read_all_files(self) -> None:
@@ -187,4 +188,4 @@ class Indexer(BaseModel):
         final_array: list[dict[str, int | str]] =\
             [chunk.model_dump() for chunk in self.metadatas_chunks]
         with open('data/processed/chunks/chunks.json', 'w') as f:
-            json.dump(final_array, f)
+            json.dump(final_array, f, indent=2)
