@@ -66,29 +66,33 @@ class Indexer(BaseModel):
     def chunk(self, new_chunk: str) -> None:
         self.__chunk = new_chunk
 
-    def split_text(self, file_content: str, file: str):
+    def split_text(self, file_content: str, file: str, end: int):
         if self.start_id == -1:
             self.start_id = 0
+        text_to_split: str = file_content[self.start_id:end]
         texts: list[Document] = self.text_splitter.\
-            create_documents([file_content])
-        offset: int = 1 if len(texts[-1].page_content) == self.chunk_size\
-            else 0
+            create_documents([text_to_split])
+        offset: int = self.start_id
+        local_id: int = 0
 
-        for n in range(len(texts) - (2 - offset)):
-            self.end_id = self.start_id + len(texts[n].page_content)
+        for n in range(len(texts)):
+            chunk_text: str = texts[n].page_content
+            local_start: int = text_to_split.find(chunk_text, local_id)
+            local_end: int = local_start + len(chunk_text)
+
+            abs_start: int = offset + local_start
+            abs_end: int = offset + local_end - 1
+
             self.metadatas_chunks.append(
                 MinimalSource(
                     file_path=file,
-                    first_character_index=self.start_id,
-                    last_character_index=self.end_id - 1,
-                    chunk=file_content[self.start_id:self.end_id]))
-            self.corpus.append(file_content[self.start_id:self.end_id])
-            self.start_id = self.end_id
+                    first_character_index=abs_start,
+                    last_character_index=abs_end,
+                    chunk=chunk_text))
+            self.corpus.append(chunk_text)
+            local_id = local_end
 
-        if not offset:
-            self.end_id = self.start_id + len(texts[-1].page_content)
-        else:
-            self.start_id = -1
+        self.start_id = -1
 
     def parse_py(self, file_content: str, file: str) -> None:
         try:
@@ -105,10 +109,12 @@ class Indexer(BaseModel):
                         )
                         self.corpus.append(file_content[self.start_id:
                                                         self.end_id])
+                        self.start_id = -1
 
                     self.chunk = get_source_segment(file_content, node)
                     if len(self.chunk) > self.chunk_size:
-                        self.split_text(self.chunk, file)
+                        self.split_text(file_content, file, len(file_content)
+                                        - 1)
                     else:
                         self.start_id = file_content.find(self.chunk)
                         self.end_id = self.start_id + len(self.chunk)
@@ -128,8 +134,10 @@ class Indexer(BaseModel):
                     self.end_id = file_content.find(self.chunk, self.start_id)\
                         + len(self.chunk)
                     if (self.end_id - self.start_id) > self.chunk_size:
-                        self.split_text(file_content[self.start_id:
-                                                     self.end_id], file)
+                        id_end: int = self.start_id + len(file_content
+                                                          [self.start_id:
+                                                           self.end_id]) - 1
+                        self.split_text(file_content, file, id_end)
                     if self.end_id == len(file_content):
                         self.metadatas_chunks.append(
                             MinimalSource(
@@ -140,8 +148,7 @@ class Indexer(BaseModel):
                         self.corpus.append(file_content[self.start_id:
                                                         self.end_id])
         except SyntaxError:
-            print(file)
-            self.split_text(file_content, file)
+            self.split_text(file_content, file, len(file_content) - 1)
 
     def read_all_files(self) -> None:
 
@@ -159,7 +166,8 @@ class Indexer(BaseModel):
                     if file.endswith('.md') or file.endswith('.txt'):
                         file_size: int = len(file_content)
                         if file_size > self.chunk_size:
-                            self.split_text(file_content, root + '/' + file)
+                            self.split_text(file_content, root + '/' + file,
+                                            file_size - 1)
                             if self.start_id != -1:
                                 self.metadatas_chunks.\
                                     append(
