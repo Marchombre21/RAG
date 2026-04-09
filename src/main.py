@@ -1,4 +1,5 @@
 import bm25s
+import fire
 from src.classes.indexer import Indexer
 
 

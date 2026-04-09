@@ -11,3 +11,6 @@ wheels/
 
 #caches
 .mypy_cache
+
+#other
+vllm-0.10.1/
