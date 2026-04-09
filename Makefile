@@ -17,7 +17,7 @@ install:
 	@$(UV) sync
 
 run:
-	@$(UV) run $(PYTHON) -m $(SRC).$(PROG)
+	@$(UV) run $(PYTHON) -m $(SRC).$(PROG) $(ARGS)
 
 debug:
 	@$(PYTHON) -m pdb $(SRC)/$(PROG).py
