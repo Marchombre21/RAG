@@ -113,8 +113,7 @@ class Indexer(BaseModel):
 
                     self.chunk = get_source_segment(file_content, node)
                     if len(self.chunk) > self.chunk_size:
-                        self.split_text(file_content, file, len(file_content)
-                                        - 1)
+                        self.split_text(file_content, file, len(file_content))
                     else:
                         self.start_id = file_content.find(self.chunk)
                         self.end_id = self.start_id + len(self.chunk)
@@ -136,7 +135,7 @@ class Indexer(BaseModel):
                     if (self.end_id - self.start_id) > self.chunk_size:
                         id_end: int = self.start_id + len(file_content
                                                           [self.start_id:
-                                                           self.end_id]) - 1
+                                                           self.end_id])
                         self.split_text(file_content, file, id_end)
                     if self.end_id == len(file_content):
                         self.metadatas_chunks.append(
@@ -148,7 +147,7 @@ class Indexer(BaseModel):
                         self.corpus.append(file_content[self.start_id:
                                                         self.end_id])
         except SyntaxError:
-            self.split_text(file_content, file, len(file_content) - 1)
+            self.split_text(file_content, file, len(file_content))
 
     def read_all_files(self) -> None:
 
@@ -167,7 +166,7 @@ class Indexer(BaseModel):
                         file_size: int = len(file_content)
                         if file_size > self.chunk_size:
                             self.split_text(file_content, root + '/' + file,
-                                            file_size - 1)
+                                            file_size)
                             if self.start_id != -1:
                                 self.metadatas_chunks.\
                                     append(
