@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from min_search import MinimalSearchResults, MinimalAnswer
+from .min_search import MinimalSearchResults, MinimalAnswer
 
 
 class StudentSearchResults(BaseModel):
