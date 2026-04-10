@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 
 class Indexer(BaseModel):
-    __start_id: int = PrivateAttr(-1)
-    __end_id: int = PrivateAttr()
+    __start_id: int = PrivateAttr(0)
+    __end_id: int = PrivateAttr(0)
     __chunk: str = PrivateAttr("")
     __text_splitter: RecursiveCharacterTextSplitter = PrivateAttr()
     chunk_size: int = Field(le=2000)
@@ -38,17 +38,9 @@ class Indexer(BaseModel):
     def corpus(self) -> list[str]:
         return self.__corpus
 
-    # @corpus.setter
-    # def corpus(self, new_start: list[str]) -> None:
-    #     self.__corpus = new_start
-
     @property
     def metadatas_chunks(self) -> list[MinimalSource]:
         return self.__metadatas_chunks
-
-    # @metadatas_chunks.setter
-    # def metadatas_chunks(self, new_start: int) -> None:
-    #     self.__metadatas_chunks = new_start
 
     @property
     def end_id(self) -> int:
@@ -67,8 +59,6 @@ class Indexer(BaseModel):
         self.__chunk = new_chunk
 
     def split_text(self, file_content: str, file: str, end: int):
-        if self.start_id == -1:
-            self.start_id = 0
         text_to_split: str = file_content[self.start_id:end]
         texts: list[Document] = self.text_splitter.\
             create_documents([text_to_split])
@@ -83,75 +73,56 @@ class Indexer(BaseModel):
             abs_start: int = offset + local_start
             abs_end: int = offset + local_end - 1
 
-            self.metadatas_chunks.append(
-                MinimalSource(
-                    file_path=file,
-                    first_character_index=abs_start,
-                    last_character_index=abs_end,
-                    chunk=chunk_text))
-            self.corpus.append(chunk_text)
-            local_id = local_end
-
-        self.start_id = -1
+            self.add_meta(file, abs_start, abs_end, chunk_text)
+            local_id = local_start
 
     def parse_py(self, file_content: str, file: str) -> None:
         try:
             file_tree = parse(file_content)
+            curr_search_index: int = 0
             for node in file_tree.body:
                 if isinstance(node, ClassDef) or isinstance(node, FunctionDef):
-                    if self.start_id != -1:
-                        self.metadatas_chunks.append(
-                            MinimalSource(
-                                file_path=file,
-                                first_character_index=self.start_id,
-                                last_character_index=self.end_id - 1,
-                                chunk=file_content[self.start_id:self.end_id])
-                        )
-                        self.corpus.append(file_content[self.start_id:
-                                                        self.end_id])
-                        self.start_id = -1
 
                     self.chunk = get_source_segment(file_content, node)
+                    self.start_id = file_content.find(self.chunk,
+                                                      curr_search_index)
+                    self.end_id = self.start_id + len(self.chunk)
                     if len(self.chunk) > self.chunk_size:
-                        self.split_text(file_content, file, len(file_content))
+                        self.split_text(file_content, file, self.end_id)
                     else:
-                        self.start_id = file_content.find(self.chunk)
-                        self.end_id = self.start_id + len(self.chunk)
-                        self.metadatas_chunks.append(
-                            MinimalSource(
-                                file_path=file,
-                                first_character_index=self.start_id,
-                                last_character_index=self.end_id - 1,
-                                chunk=file_content[self.start_id:self.end_id]))
-                        self.corpus.append(self.chunk)
-                        self.start_id = -1
+                        self.end_id = self.start_id + len(self.chunk) - 1
+                        self.add_meta(file, self.start_id, self.end_id,
+                                      self.chunk)
 
                 else:
                     self.chunk = get_source_segment(file_content, node)
-                    if self.start_id == -1:
-                        self.start_id = file_content.find(self.chunk)
-                    self.end_id = file_content.find(self.chunk, self.start_id)\
-                        + len(self.chunk)
+                    self.start_id = file_content.find(self.chunk,
+                                                      curr_search_index)
+                    self.end_id = self.start_id + len(self.chunk)
                     if (self.end_id - self.start_id) > self.chunk_size:
-                        id_end: int = self.start_id + len(file_content
-                                                          [self.start_id:
-                                                           self.end_id])
-                        self.split_text(file_content, file, id_end)
-                    if self.end_id == len(file_content):
-                        self.metadatas_chunks.append(
-                            MinimalSource(
-                                file_path=file,
-                                first_character_index=self.start_id,
-                                last_character_index=self.end_id - 1,
-                                chunk=file_content[self.start_id:self.end_id]))
-                        self.corpus.append(file_content[self.start_id:
-                                                        self.end_id])
+                        self.split_text(file_content, file, self.end_id)
+                    else:
+                        self.add_meta(file, self.start_id, self.end_id,
+                                      self.chunk)
+                curr_search_index = self.start_id + len(self.chunk)
         except SyntaxError:
+            self.start_id = 0
             self.split_text(file_content, file, len(file_content))
+
+    def add_meta(self, file_path: str, first_char: int, last_char: int,
+                 text: str):
+        self.metadatas_chunks.append(
+            MinimalSource(
+                        file_path=file_path,
+                        first_character_index=first_char,
+                        last_character_index=last_char,
+                        chunk=text)
+                        )
+        self.corpus.append(text)
 
     def read_all_files(self) -> None:
 
-        for root, dirs, files in os.walk("data/vllm-0.10.1/"):
+        for root, _, files in os.walk("data/vllm-0.10.1/"):
             for file in files:
                 if (
                     file.endswith(".py")
@@ -167,29 +138,10 @@ class Indexer(BaseModel):
                         if file_size > self.chunk_size:
                             self.split_text(file_content, root + '/' + file,
                                             file_size)
-                            if self.start_id != -1:
-                                self.metadatas_chunks.\
-                                    append(
-                                        MinimalSource(
-                                            file_path=root + '/' + file,
-                                            first_character_index=self.
-                                            start_id,
-                                            last_character_index=self.end_id-1,
-                                            chunk=file_content[self.start_id:
-                                                               self.end_id]))
-                                self.corpus.append(file_content[self.start_id:
-                                                                self.end_id])
-                                self.start_id = -1
                         else:
-                            self.metadatas_chunks.append(
-                                MinimalSource(
-                                            file_path=root + '/' + file,
-                                            first_character_index=0,
-                                            last_character_index=len(
-                                                file_content) - 1,
-                                            chunk=file_content)
-                                            )
-                            self.corpus.append(file_content)
+                            self.add_meta(root + '/' + file, 0, len(
+                                file_content) - 1, file_content)
+                    self.start_id = 0
 
     def store(self):
         final_array: list[dict[str, int | str]] =\
