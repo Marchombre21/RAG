@@ -1,5 +1,5 @@
 import uuid
-from mininal_source import MinimalSource
+from .mininal_source import MinimalSource
 from pydantic import BaseModel, Field
 
 
