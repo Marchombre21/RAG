@@ -16,7 +16,6 @@ class Indexer(BaseModel):
     __corpus: list[str] = PrivateAttr(default_factory=list)
     __metadatas_chunks: list[MinimalSource] =\
         PrivateAttr(default_factory=list)
-    # __edge_nodes: bool = PrivateAttr(default=False)
 
     def init_splitter(self) -> None:
         self.__text_splitter = RecursiveCharacterTextSplitter(
@@ -34,14 +33,6 @@ class Indexer(BaseModel):
     @start_id.setter
     def start_id(self, new_start: int) -> None:
         self.__start_id = new_start
-
-    # @property
-    # def edge_nodes(self) -> bool:
-    #     return self.__edge_nodes
-
-    # @edge_nodes.setter
-    # def edge_nodes(self, new_bool: bool) -> None:
-    #     self.__edge_nodes = new_bool
 
     @property
     def corpus(self) -> list[str]:
@@ -95,8 +86,7 @@ class Indexer(BaseModel):
                     if self.chunk:
                         self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
-                        # self.edge_nodes = False
-                        curr_search_index = self.start_id + len(self.chunk)
+                        curr_search_index = self.end_id
                     self.chunk = get_source_segment(file_content, node)
                     self.start_id = file_content.find(self.chunk,
                                                       curr_search_index)
@@ -111,31 +101,28 @@ class Indexer(BaseModel):
 
                 else:
                     text_to_add: str = get_source_segment(file_content, node)
-                    if self.chunk and len(self.chunk) + len(text_to_add)\
+                    node_start_id: int = file_content.find(text_to_add,
+                                                           curr_search_index)
+                    node_end_id: int = node_start_id + len(text_to_add)
+                    if self.chunk and (node_end_id - self.start_id)\
                             > self.chunk_size:
                         self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
-                        # self.edge_nodes = False
                         curr_search_index = self.start_id + len(self.chunk)
                         self.chunk = ''
                     if not self.chunk:
-                        self.start_id = file_content.find(
-                            text_to_add, curr_search_index)
-                        # self.edge_nodes = True
-                    self.chunk += text_to_add
-                    self.end_id = self.start_id + len(self.chunk)
-                    if (self.end_id - self.start_id) >= self.chunk_size:
+                        self.start_id = node_start_id
+                    self.end_id = node_end_id
+                    self.chunk = file_content[self.start_id:self.end_id]
+                    if len(self.chunk) > self.chunk_size:
                         self.split_text(file_content, file, self.end_id)
-                        curr_search_index = self.start_id + len(self.chunk)
+                        curr_search_index = self.end_id
                         self.chunk = ''
-                        # self.edge_nodes = False
                     elif i == len(file_tree.body) - 1:
                         self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
                     else:
-                        curr_search_index = self.start_id + len(self.chunk)
-                    #     self.add_meta(file, self.start_id, self.end_id - 1,
-                    #                   self.chunk)
+                        curr_search_index = self.end_id
         except SyntaxError:
             self.start_id = 0
             self.split_text(file_content, file, len(file_content))

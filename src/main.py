@@ -97,12 +97,11 @@ class CliCommands:
         context: str = '\n'.join([min_src.chunk for min_src in
                                   min_search_res.retrieved_sources])
         messages = [
-            {"role": "system", "content": "You are an extraction tool. Answer"
-             "using EXACTLY the text from the Context. Do not invent, compute,"
-             "or guess numerical values. Do not include any reasoning,"
-             "explanation, or <think> tags. Output the answer immediately."},
+            {"role": "system", "content": "You are an extraction tool.\nAnswer"
+             "using EXACTLY the text from the Context.\nOutput the answer"
+             "immediately."},
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\
-             \n{question}\nAnswer:"}
+             \n{question}\n**Answer**:\n"}
         ]
 
         prompt = generator.tokenizer.apply_chat_template(
@@ -118,7 +117,7 @@ class CliCommands:
             max_new_tokens=1024,
             do_sample=False,
             repetition_penalty=1.2)
-        print(f"answer: {preds[0]['generated_text'].split('</think>')[-1].strip()}")
+        print(f"answer: {preds[0]['generated_text'].split('</think>')[-1].split('**Answer**:')[-1].strip()}")
 
 
 if __name__ == "__main__":
