@@ -16,6 +16,7 @@ class Indexer(BaseModel):
     __corpus: list[str] = PrivateAttr(default_factory=list)
     __metadatas_chunks: list[MinimalSource] =\
         PrivateAttr(default_factory=list)
+    # __edge_nodes: bool = PrivateAttr(default=False)
 
     def init_splitter(self) -> None:
         self.__text_splitter = RecursiveCharacterTextSplitter(
@@ -33,6 +34,14 @@ class Indexer(BaseModel):
     @start_id.setter
     def start_id(self, new_start: int) -> None:
         self.__start_id = new_start
+
+    # @property
+    # def edge_nodes(self) -> bool:
+    #     return self.__edge_nodes
+
+    # @edge_nodes.setter
+    # def edge_nodes(self, new_bool: bool) -> None:
+    #     self.__edge_nodes = new_bool
 
     @property
     def corpus(self) -> list[str]:
@@ -80,9 +89,14 @@ class Indexer(BaseModel):
         try:
             file_tree = parse(file_content)
             curr_search_index: int = 0
-            for node in file_tree.body:
+            for i, node in enumerate(file_tree.body):
                 if isinstance(node, ClassDef) or isinstance(node, FunctionDef):
 
+                    if self.chunk:
+                        self.add_meta(file, self.start_id, self.end_id - 1,
+                                      self.chunk)
+                        # self.edge_nodes = False
+                        curr_search_index = self.start_id + len(self.chunk)
                     self.chunk = get_source_segment(file_content, node)
                     self.start_id = file_content.find(self.chunk,
                                                       curr_search_index)
@@ -93,18 +107,35 @@ class Indexer(BaseModel):
                         self.end_id = self.start_id + len(self.chunk) - 1
                         self.add_meta(file, self.start_id, self.end_id,
                                       self.chunk)
+                    self.chunk = ''
 
                 else:
-                    self.chunk = get_source_segment(file_content, node)
-                    self.start_id = file_content.find(self.chunk,
-                                                      curr_search_index)
-                    self.end_id = self.start_id + len(self.chunk)
-                    if (self.end_id - self.start_id) > self.chunk_size:
-                        self.split_text(file_content, file, self.end_id)
-                    else:
-                        self.add_meta(file, self.start_id, self.end_id,
+                    text_to_add: str = get_source_segment(file_content, node)
+                    if self.chunk and len(self.chunk) + len(text_to_add)\
+                            > self.chunk_size:
+                        self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
-                curr_search_index = self.start_id + len(self.chunk)
+                        # self.edge_nodes = False
+                        curr_search_index = self.start_id + len(self.chunk)
+                        self.chunk = ''
+                    if not self.chunk:
+                        self.start_id = file_content.find(
+                            text_to_add, curr_search_index)
+                        # self.edge_nodes = True
+                    self.chunk += text_to_add
+                    self.end_id = self.start_id + len(self.chunk)
+                    if (self.end_id - self.start_id) >= self.chunk_size:
+                        self.split_text(file_content, file, self.end_id)
+                        curr_search_index = self.start_id + len(self.chunk)
+                        self.chunk = ''
+                        # self.edge_nodes = False
+                    elif i == len(file_tree.body) - 1:
+                        self.add_meta(file, self.start_id, self.end_id - 1,
+                                      self.chunk)
+                    else:
+                        curr_search_index = self.start_id + len(self.chunk)
+                    #     self.add_meta(file, self.start_id, self.end_id - 1,
+                    #                   self.chunk)
         except SyntaxError:
             self.start_id = 0
             self.split_text(file_content, file, len(file_content))
@@ -118,11 +149,12 @@ class Indexer(BaseModel):
                         last_character_index=last_char,
                         chunk=text)
                         )
-        self.corpus.append(text)
+        new_path: str = file_path.split('/')[-1].replace('.py', '')
+        self.corpus.append('Keywords:' + new_path + '\n' + text)
 
     def read_all_files(self) -> None:
 
-        for root, _, files in os.walk("data/vllm-0.10.1/"):
+        for root, _, files in os.walk("data/raw/vllm-0.10.1/"):
             for file in files:
                 if (
                     file.endswith(".py")
