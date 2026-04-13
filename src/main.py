@@ -1,23 +1,21 @@
-from vllm import LLM, SamplingParams
+import ast
+from os import walk
 
 
 def main():
 
-    prompts = [
-        "Hello, my name is",
-        "The president of the United States is",
-        "The capital of France is",
-        "The future of AI is",
-    ]
-
-    llm = LLM(model='Qwen/Qwen3-0.6B')
-    sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
-    outputs = llm.generate(prompts, sampling_params)
-    for output in outputs:
-        print('output: ', output)
-        prompt = output.prompt
-        generated_text = output.outputs[0].text
-        print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
+    with open('src/main.py', 'r') as f:
+        code: str = f.read()
+    for (root, dirs, files) in walk('vllm-0.10.1/vllm-0.10.1/'):
+        print("Directory path: ", root)
+        print("Directory Names: ", dirs)
+        print("Files Names: ", files)
+    parser = ast.parse(code)
+    # for node in ast.walk(parser):
+    #     if isinstance(node, ast.FunctionDef):
+    #         print(node.name)
+    #     if isinstance(node, ast.Call):
+    #         print(node.args)
 
 
 if __name__ == "__main__":
