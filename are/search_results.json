@@ -1,0 +1,41 @@
+{
+  "search_results": [
+    {
+      "question_id": "q1",
+      "question": "'What",
+      "retrieved_sources": [
+        {
+          "file_path": "data/vllm-0.10.1/vllm-0.10.1/examples/offline_inference/audio_language.py",
+          "first_character_index": 769,
+          "last_character_index": 922,
+          "chunk": "question_per_audio_count = {\n    0: \"What is 1+1?\",\n    1: \"What is recited in the audio?\",\n    2: \"What sport and what nursery rhyme are referenced?\",\n}"
+        },
+        {
+          "file_path": "data/vllm-0.10.1/vllm-0.10.1/examples/offline_inference/neuron_multimodal.py",
+          "first_character_index": 410,
+          "last_character_index": 602,
+          "chunk": "PROMPTS = [\n    \"What is in this image? Tell me a story\",\n    \"What is the recipe of mayonnaise in two sentences?\",\n    \"Describe this image\",\n    \"What is the capital of Italy famous for?\",\n]"
+        },
+        {
+          "file_path": "data/vllm-0.10.1/vllm-0.10.1/tests/models/language/pooling/test_scoring.py",
+          "first_character_index": 360,
+          "last_character_index": 450,
+          "chunk": "TEXTS_1 = [\n    \"What is the capital of France?\",\n    \"What is the capital of Germany?\",\n]"
+        },
+        {
+          "file_path": "data/vllm-0.10.1/vllm-0.10.1/tests/models/multimodal/pooling/test_dse_qwen2_vl.py",
+          "first_character_index": 755,
+          "last_character_index": 909,
+          "chunk": "HF_IMAGE_PROMPTS = IMAGE_ASSETS.prompts({\n    \"stop_sign\":\n    \"What is shown in this image?\",\n    \"cherry_blossom\":\n    \"What is shown in this image?\"\n})"
+        },
+        {
+          "file_path": "data/vllm-0.10.1/vllm-0.10.1/tests/models/multimodal/generation/vlm_utils/types.py",
+          "first_character_index": 1058,
+          "last_character_index": 1255,
+          "chunk": "SINGLE_IMAGE_BASE_PROMPTS = IMAGE_ASSETS.prompts({\n    \"stop_sign\": f\"{TEST_IMG_PLACEHOLDER}What's the content of the image?\",\n    \"cherry_blossom\": f\"{TEST_IMG_PLACEHOLDER}What is the season?\",\n})"
+        }
+      ]
+    }
+  ],
+  "k": 5
+}

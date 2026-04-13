@@ -1,25 +1,127 @@
-import ast
-from os import walk
+import bm25s
+import json
+import os
+import fire
+from transformers import pipeline, Pipeline
+from bm25s import BM25
+from src.classes.stud_search import StudentSearchResults
+from src.classes.rag_model import RagDataset
+from src.classes.min_search import MinimalSource, MinimalSearchResults
+from src.classes.indexer import Indexer
 
 
-def main():
+class CliCommands:
 
-    with open('src/main.py', 'r') as f:
-        code: str = f.read()
-    for (root, dirs, files) in walk('vllm-0.10.1/vllm-0.10.1/'):
-        print("Directory path: ", root)
-        print("Directory Names: ", dirs)
-        print("Files Names: ", files)
-    parser = ast.parse(code)
-    # for node in ast.walk(parser):
-    #     if isinstance(node, ast.FunctionDef):
-    #         print(node.name)
-    #     if isinstance(node, ast.Call):
-    #         print(node.args)
+    @staticmethod
+    def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
+        retriever = BM25.load('data/processed/bm25_index/')
+        metadatas_chunks: list[dict[str, int | str]]
+
+        with open('data/processed/chunks/chunks.json') as f:
+            metadatas_chunks = json.load(f)
+        return (retriever, metadatas_chunks)
+
+    @staticmethod
+    def write_output_search(min_search_res: list[MinimalSearchResults],
+                            save_directory: str, k: int) -> None:
+
+        stud_search_res: StudentSearchResults = StudentSearchResults(
+            search_results=min_search_res, k=k)
+        os.makedirs(save_directory, exist_ok=True)
+        with open(save_directory + '/search_results.json', 'w') as f:
+            f.write(stud_search_res.model_dump_json(indent=2))
+
+    @staticmethod
+    def get_search_res(question: str, k: int,
+                       pack_datas: tuple[BM25, list[dict[str, int | str]]],
+                       id: str = 'q1') -> MinimalSearchResults:
+
+        retriever: BM25
+        metadatas_chunks: list[dict[str, int | str]]
+        retriever, metadatas_chunks = pack_datas
+        query_tokens = bm25s.tokenize(question)
+        docs, _ = retriever.retrieve(query_tokens, k=k)
+        final_list: list[MinimalSource] = []
+
+        for i in range(k):
+            final_list.append(
+                MinimalSource.model_validate(metadatas_chunks[docs[0, i]]))
+
+        min_search_res: MinimalSearchResults = MinimalSearchResults(
+            question_id=id, question=question,
+            retrieved_sources=final_list)
+
+        return min_search_res
+
+    def index(self, max_chunk_size: int = 2000):
+        indexer: Indexer = Indexer(chunk_size=max_chunk_size)
+        indexer.init_splitter()
+        indexer.read_all_files()
+        indexer.store()
+
+        retriever = BM25()
+        corpus_tokens = bm25s.tokenize(indexer.corpus)
+        retriever.index(corpus_tokens)
+        retriever.save('data/processed/bm25_index/', corpus=indexer.corpus)
+
+    def search(self, question: str, k: int, save_directory: str) -> None:
+
+        min_search_res: MinimalSearchResults = self.get_search_res(
+            question, k, self.get_retriever())
+
+        self.write_output_search([min_search_res], save_directory, k)
+
+    def search_dataset(self, dataset_path: str, k: int, save_directory: str)\
+            -> None:
+
+        pack_datas: tuple[BM25, list[dict[str, int | str]]] =\
+            self.get_retriever()
+        list_min_search: list[MinimalSearchResults] = []
+        with open(dataset_path, 'r') as f:
+            quest_dict: RagDataset = RagDataset.model_validate(json.load(f))
+        for question in quest_dict.rag_questions:
+            list_min_search.append(
+                self.get_search_res(question.question, k, pack_datas,
+                                    question.question_id))
+        self.write_output_search(list_min_search, save_directory, k)
+
+    def answer(self, question: str, k: int,
+               save_directory: str = 'data/output/answer_results') -> None:
+
+        pack_datas: tuple[BM25, list[dict[str, int | str]]] =\
+            self.get_retriever()
+        min_search_res: MinimalSearchResults = self.get_search_res(
+            question, k, pack_datas)
+        generator: Pipeline = pipeline('text-generation',
+                                       'Qwen/Qwen3-0.6B')
+        context: str = '\n'.join([min_src.chunk for min_src in
+                                  min_search_res.retrieved_sources])
+        messages = [
+            {"role": "system", "content": "You are an extraction tool.\nAnswer"
+             "using EXACTLY the text from the Context.\nOutput the answer"
+             "immediately."},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\
+             \n{question}\n**Answer**:\n"}
+        ]
+
+        prompt = generator.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        preds = generator(
+            text_inputs=prompt,
+            return_full_text=False,
+            max_length=None,
+            max_new_tokens=1024,
+            do_sample=False,
+            repetition_penalty=1.2)
+        print(f"answer: {preds[0]['generated_text'].split('</think>')[-1].split('**Answer**:')[-1].strip()}")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    # try:
+    fire.Fire(CliCommands)
+    # except Exception as e:
+    #     print(e)
