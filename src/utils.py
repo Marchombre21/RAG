@@ -64,8 +64,9 @@ def get_search_res(question: str,
                    pack_datas: tuple[BM25, list[dict[str, int | str]]],
                    id: str = 'q1') -> MinimalSearchResults:
 
-    final_list: list[MinimalSource] = get_min_source(
-        pack_datas=pack_datas, question=question, k=k)
+    final_list: list[MinimalSource] = get_min_source(pack_datas=pack_datas,
+                                                     question=question,
+                                                     k=k)
 
     min_search_res: MinimalSearchResults = MinimalSearchResults(
         question_id=id, question_str=question, retrieved_sources=final_list)
@@ -113,6 +114,7 @@ def get_answer(question: str,
         question_id=id,
         question_str=question,
         retrieved_sources=final_list,
-        answer=preds[0]['generated_text'].split("**Answer**:")[-1].strip())
+        answer=preds[0]['generated_text'].split('</think>')[-1].split(
+            "**Answer**:")[-1].strip())
 
     return min_answer
