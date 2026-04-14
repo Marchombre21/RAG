@@ -165,5 +165,6 @@ class Indexer(BaseModel):
     def store(self):
         final_array: list[dict[str, int | str]] =\
             [chunk.model_dump() for chunk in self.metadatas_chunks]
+        os.makedirs('data/processed/chunks/', exist_ok=True)
         with open('data/processed/chunks/chunks.json', 'w') as f:
             json.dump(final_array, f, indent=2)
