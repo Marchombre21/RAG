@@ -1,5 +1,6 @@
 import os
 import json
+from tqdm import tqdm
 from ast import parse, FunctionDef, ClassDef, get_source_segment
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -19,8 +20,7 @@ class Indexer(BaseModel):
 
     def init_splitter(self) -> None:
         self.__text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size
-        )
+            chunk_size=self.chunk_size)
 
     @property
     def text_splitter(self) -> RecursiveCharacterTextSplitter:
@@ -78,6 +78,9 @@ class Indexer(BaseModel):
 
     def parse_py(self, file_content: str, file: str) -> None:
         try:
+            self.chunk = ''
+            self.start_id = 0
+            self.end_id = 0
             file_tree = parse(file_content)
             curr_search_index: int = 0
             for i, node in enumerate(file_tree.body):
@@ -101,8 +104,8 @@ class Indexer(BaseModel):
 
                 else:
                     text_to_add: str = get_source_segment(file_content, node)
-                    node_start_id: int = file_content.find(text_to_add,
-                                                           curr_search_index)
+                    node_start_id: int = file_content.find(
+                        text_to_add, curr_search_index)
                     node_end_id: int = node_start_id + len(text_to_add)
                     if self.chunk and (node_end_id - self.start_id)\
                             > self.chunk_size:
@@ -121,6 +124,7 @@ class Indexer(BaseModel):
                     elif i == len(file_tree.body) - 1:
                         self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
+                        self.chunk = ''
                     else:
                         curr_search_index = self.end_id
         except SyntaxError:
@@ -130,24 +134,23 @@ class Indexer(BaseModel):
     def add_meta(self, file_path: str, first_char: int, last_char: int,
                  text: str):
         self.metadatas_chunks.append(
-            MinimalSource(
-                        file_path=file_path,
-                        first_character_index=first_char,
-                        last_character_index=last_char,
-                        chunk=text)
-                        )
+            MinimalSource(file_path=file_path,
+                          first_character_index=first_char,
+                          last_character_index=last_char,
+                          chunk=text))
         new_path: str = file_path.split('/')[-1].replace('.py', '')
         self.corpus.append('Keywords:' + new_path + '\n' + text)
 
     def read_all_files(self) -> None:
 
-        for root, _, files in os.walk("data/raw/vllm-0.10.1/"):
+        file_counter: int = 0
+        for _ in os.walk("data/raw/vllm-0.10.1/"):
+            file_counter += 1
+        for root, _, files in tqdm(os.walk("data/raw/vllm-0.10.1/"),
+                                   total=file_counter, unit='files'):
             for file in files:
-                if (
-                    file.endswith(".py")
-                    or file.endswith(".md")
-                    or file.endswith(".txt")
-                ):
+                if (file.endswith(".py") or file.endswith(".md")
+                        or file.endswith(".txt")):
                     with open(root + "/" + file, "r") as f:
                         file_content: str = f.read()
                     if file.endswith(".py"):
@@ -158,8 +161,8 @@ class Indexer(BaseModel):
                             self.split_text(file_content, root + '/' + file,
                                             file_size)
                         else:
-                            self.add_meta(root + '/' + file, 0, len(
-                                file_content) - 1, file_content)
+                            self.add_meta(root + '/' + file, 0,
+                                          len(file_content) - 1, file_content)
                     self.start_id = 0
 
     def store(self):
