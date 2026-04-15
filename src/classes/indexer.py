@@ -1,6 +1,7 @@
 import os
 import json
 from tqdm import tqdm
+from .errors import ImpossibleStoreError
 from ast import parse, FunctionDef, ClassDef, get_source_segment
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -144,9 +145,11 @@ class Indexer(BaseModel):
     def read_all_files(self) -> None:
 
         file_counter: int = 0
-        for _ in os.walk("data/raw/vllm-0.10.1/"):
+        for _ in os.walk("data/raw/"):
             file_counter += 1
-        for root, _, files in tqdm(os.walk("data/raw/vllm-0.10.1/"),
+        if file_counter == 0:
+            raise ImpossibleStoreError()
+        for root, _, files in tqdm(os.walk("data/raw/"),
                                    total=file_counter, unit='files'):
             for file in files:
                 if (file.endswith(".py") or file.endswith(".md")

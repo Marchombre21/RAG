@@ -1,18 +1,22 @@
 import bm25s
 import os
 import json
-from transformers import Pipeline
+from ollama import chat, ChatResponse
 from bm25s import BM25
-from .classes import (MinimalAnswer, MinimalSearchResults, MinimalSource,
-                      StudentSearchResults, StudentSearchResultsAndAnswer)
+from .classes import (MinimalAnswer, RetrieveError, MinimalSearchResults,
+                      MinimalSource, StudentSearchResults,
+                      StudentSearchResultsAndAnswer)
 
 
 def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
-    retriever = BM25.load('data/processed/bm25_index/')
-    metadatas_chunks: list[dict[str, int | str]]
+    try:
+        retriever = BM25.load('data/processed/bm25_index/')
+        metadatas_chunks: list[dict[str, int | str]]
 
-    with open('data/processed/chunks/chunks.json') as f:
-        metadatas_chunks = json.load(f)
+        with open('data/processed/chunks/chunks.json') as f:
+            metadatas_chunks = json.load(f)
+    except FileNotFoundError:
+        raise RetrieveError()
     return (retriever, metadatas_chunks)
 
 
@@ -76,9 +80,7 @@ def get_search_res(question: str,
 
 def get_answer(question: str,
                final_list: list[MinimalSource],
-               generator: Pipeline,
                id: str = 'q1') -> MinimalAnswer:
-
     context: str = '\n'.join([min_src.chunk for min_src in final_list])
 
     messages = [{
@@ -86,35 +88,27 @@ def get_answer(question: str,
         "system",
         "content":
         "You are an extraction tool.\nAnswer"
-        "using EXACTLY the text from the Context.\nOutput the answer"
-        "immediately."
+        " using EXACTLY the text from the Context.\nOutput the answer"
+        " immediately"
     }, {
         "role":
         "user",
         "content":
         f"Context:\n{context}\n\nQuestion:\
             \n{question}\n"
-    }, {
-        "role": "system",
-        "content": "**Answer**:\n"
     }]
 
-    prompt = generator.tokenizer.apply_chat_template(messages,
-                                                     enable_thinking=False,
-                                                     tokenize=False)
-
-    preds = generator(text_inputs=prompt,
-                      return_full_text=False,
-                      max_length=None,
-                      max_new_tokens=1024,
-                      do_sample=False,
-                      repetition_penalty=1.2)
+    response: ChatResponse = chat(model='qwen3:0.6b',
+                                  messages=messages,
+                                  options={
+                                      'num_predict': 1024,
+                                      'temperature': 0.0
+                                  })
 
     min_answer: MinimalAnswer = MinimalAnswer(
         question_id=id,
         question_str=question,
         retrieved_sources=final_list,
-        answer=preds[0]['generated_text'].split('</think>')[-1].split(
-            "**Answer**:")[-1].strip())
+        answer=response.message.content.split('</think>')[-1].strip())
 
     return min_answer

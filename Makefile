@@ -16,7 +16,7 @@ help:
 install:
 	@$(UV) sync
 
-run:
+run: serve
 	@$(UV) run $(PYTHON) -m $(SRC).$(PROG) $(ARGS)
 
 debug:
@@ -26,6 +26,9 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
+
+serve:
+	@pgrep -x "ollama" > /dev/null || nohup ollama serve > /dev/null 2>&1 &
 
 clean-all:
 	rm -rf .venv/
@@ -43,4 +46,4 @@ lint-strict:
 	$(UV) run $(PYTHON) -m flake8 src/*.py
 	$(UV) run $(PYTHON) -m mypy src/*.py --strict
 
-.PHONY: help install clean-all run clean debug lint lint-strict
+.PHONY: help install clean-all run clean debug lint lint-strict serve
