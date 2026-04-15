@@ -3,12 +3,13 @@ import json
 import os
 import fire
 # from time import time
+from typing import Any
 from tqdm import tqdm
 from pydantic import ValidationError
 from bm25s import BM25
-from src.classes import (FilePathError, StudentSearchResults, RagDataset,
-                         MinimalSource, MinimalSearchResults, MinimalAnswer,
-                         Indexer)
+from src.classes import (FilePathError, AnsweredQuestion, StudentSearchResults,
+                         RagDataset, MinimalSource, MinimalSearchResults,
+                         MinimalAnswer, Indexer)
 from .utils import (get_answer, get_min_source, get_retriever,
                     write_output_answer, write_output_search, get_search_res)
 
@@ -45,8 +46,12 @@ class CliCommands:
         list_min_search: list[MinimalSearchResults] = []
         try:
             with open(dataset_path, 'r') as f:
+                python_object: list[dict[str, Any]] = json.load(f)
                 quest_dict: RagDataset = RagDataset.model_validate(
-                    json.load(f))
+                    python_object)
+                if 'UnansweredQuestions' not in dataset_path:
+                    for question in python_object.get('rag_questions'):
+                        AnsweredQuestion.model_validate(question)
         except FileNotFoundError:
             raise FilePathError(dataset_path)
         for question in quest_dict.rag_questions:
@@ -105,8 +110,10 @@ class CliCommands:
 if __name__ == "__main__":
     try:
         fire.Fire(CliCommands)
+    except ValidationError as e:
+        errors: dict[str, Any] = e.errors()
+        for error in errors:
+            print(f'A Pydantic error of type {error["type"]} occurs.'
+                  f' {error["msg"]} in {error["loc"]} attribut.')
     except Exception as e:
         print(e)
-    except ValidationError as e:
-        print(e.errors())
-
