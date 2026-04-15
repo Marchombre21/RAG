@@ -2,10 +2,13 @@ import bm25s
 import json
 import os
 import fire
+# from time import time
 from tqdm import tqdm
+from pydantic import ValidationError
 from bm25s import BM25
-from src.classes import (StudentSearchResults, RagDataset, MinimalSource,
-                         MinimalSearchResults, MinimalAnswer, Indexer)
+from src.classes import (FilePathError, StudentSearchResults, RagDataset,
+                         MinimalSource, MinimalSearchResults, MinimalAnswer,
+                         Indexer)
 from .utils import (get_answer, get_min_source, get_retriever,
                     write_output_answer, write_output_search, get_search_res)
 
@@ -40,8 +43,12 @@ class CliCommands:
         pack_datas: tuple[BM25, list[dict[str, int | str]]] =\
             get_retriever()
         list_min_search: list[MinimalSearchResults] = []
-        with open(dataset_path, 'r') as f:
-            quest_dict: RagDataset = RagDataset.model_validate(json.load(f))
+        try:
+            with open(dataset_path, 'r') as f:
+                quest_dict: RagDataset = RagDataset.model_validate(
+                    json.load(f))
+        except FileNotFoundError:
+            raise FilePathError(dataset_path)
         for question in quest_dict.rag_questions:
             list_min_search.append(
                 get_search_res(question.question, k, pack_datas,
@@ -52,12 +59,16 @@ class CliCommands:
     def answer(question: str,
                k: int,
                save_directory: str = 'data/output/answer_results') -> None:
+        # start: float = time()
 
         final_list: list[MinimalSource] = get_min_source(
             pack_datas=get_retriever(), question=question, k=k)
 
         min_answer: MinimalAnswer = get_answer(question=question,
                                                final_list=final_list)
+        # end: float = time()
+
+        # print('Temps de traitement: ', round(end - start, 4))
 
         write_output_answer([min_answer], save_directory, k)
 
@@ -65,14 +76,17 @@ class CliCommands:
     def answer_dataset(student_search_results_path: str, save_directory: str):
 
         list_min_answer: list[MinimalAnswer] = []
-        with open(student_search_results_path, 'r') as f:
-            stud_search_res: StudentSearchResults =\
-                StudentSearchResults.model_validate(json.load(f))
-            for search in tqdm(stud_search_res.search_results):
-                list_min_answer.append(
-                    get_answer(question=search.question_str,
-                               final_list=search.retrieved_sources,
-                               id=search.question_id))
+        try:
+            with open(student_search_results_path, 'r') as f:
+                stud_search_res: StudentSearchResults =\
+                    StudentSearchResults.model_validate(json.load(f))
+                for search in tqdm(stud_search_res.search_results):
+                    list_min_answer.append(
+                        get_answer(question=search.question_str,
+                                   final_list=search.retrieved_sources,
+                                   id=search.question_id))
+        except FileNotFoundError:
+            raise FilePathError(student_search_results_path)
 
         write_output_answer(list_min_answer, save_directory, stud_search_res.k)
 
@@ -89,7 +103,10 @@ class CliCommands:
 
 
 if __name__ == "__main__":
-    # try:
-    fire.Fire(CliCommands)
-    # except Exception as e:
-    #     print(e)
+    try:
+        fire.Fire(CliCommands)
+    except Exception as e:
+        print(e)
+    except ValidationError as e:
+        print(e.errors())
+

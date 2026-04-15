@@ -3,16 +3,20 @@ import os
 import json
 from ollama import chat, ChatResponse
 from bm25s import BM25
-from .classes import (MinimalAnswer, MinimalSearchResults, MinimalSource,
-                      StudentSearchResults, StudentSearchResultsAndAnswer)
+from .classes import (MinimalAnswer, RetrieveError, MinimalSearchResults,
+                      MinimalSource, StudentSearchResults,
+                      StudentSearchResultsAndAnswer)
 
 
 def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
-    retriever = BM25.load('data/processed/bm25_index/')
-    metadatas_chunks: list[dict[str, int | str]]
+    try:
+        retriever = BM25.load('data/processed/bm25_index/')
+        metadatas_chunks: list[dict[str, int | str]]
 
-    with open('data/processed/chunks/chunks.json') as f:
-        metadatas_chunks = json.load(f)
+        with open('data/processed/chunks/chunks.json') as f:
+            metadatas_chunks = json.load(f)
+    except FileNotFoundError:
+        raise RetrieveError()
     return (retriever, metadatas_chunks)
 
 
@@ -77,7 +81,6 @@ def get_search_res(question: str,
 def get_answer(question: str,
                final_list: list[MinimalSource],
                id: str = 'q1') -> MinimalAnswer:
-
     context: str = '\n'.join([min_src.chunk for min_src in final_list])
 
     messages = [{
@@ -95,7 +98,8 @@ def get_answer(question: str,
             \n{question}\n"
     }]
 
-    response: ChatResponse = chat(model='qwen3:0.6b', messages=messages,
+    response: ChatResponse = chat(model='qwen3:0.6b',
+                                  messages=messages,
                                   options={
                                       'num_predict': 1024,
                                       'temperature': 0.0
