@@ -3,7 +3,6 @@ import json
 import os
 import fire
 from tqdm import tqdm
-from transformers import pipeline, Pipeline
 from bm25s import BM25
 from src.classes import (StudentSearchResults, RagDataset, MinimalSource,
                          MinimalSearchResults, MinimalAnswer, Indexer)
@@ -57,12 +56,8 @@ class CliCommands:
         final_list: list[MinimalSource] = get_min_source(
             pack_datas=get_retriever(), question=question, k=k)
 
-        generator: Pipeline = pipeline('text-generation',
-                                       'Qwen/Qwen3-0.6B')
-
         min_answer: MinimalAnswer = get_answer(question=question,
-                                               final_list=final_list,
-                                               generator=generator)
+                                               final_list=final_list)
 
         write_output_answer([min_answer], save_directory, k)
 
@@ -70,16 +65,13 @@ class CliCommands:
     def answer_dataset(student_search_results_path: str, save_directory: str):
 
         list_min_answer: list[MinimalAnswer] = []
-        generator: Pipeline = pipeline('text-generation',
-                                       'Qwen/Qwen3-0.6B')
         with open(student_search_results_path, 'r') as f:
             stud_search_res: StudentSearchResults =\
                 StudentSearchResults.model_validate(json.load(f))
             for search in tqdm(stud_search_res.search_results):
                 list_min_answer.append(
-                    get_answer(question=search.question,
+                    get_answer(question=search.question_str,
                                final_list=search.retrieved_sources,
-                               generator=generator,
                                id=search.question_id))
 
         write_output_answer(list_min_answer, save_directory, stud_search_res.k)

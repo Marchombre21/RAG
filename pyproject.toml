@@ -8,6 +8,7 @@ dependencies = [
     "bm25s>=0.3.3",
     "fire>=0.7.1",
     "langchain-text-splitters>=1.1.1",
+    "ollama>=0.6.1",
     "pydantic>=2.12.5",
     "tqdm>=4.67.3",
     "transformers>=4.57.6",
