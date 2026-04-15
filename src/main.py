@@ -58,7 +58,7 @@ class CliCommands:
             pack_datas=get_retriever(), question=question, k=k)
 
         generator: Pipeline = pipeline('text-generation',
-                                       'Qwen/Qwen3-0.6B')
+                                       'Qwen/Qwen3-0.6B', device=0)
 
         min_answer: MinimalAnswer = get_answer(question=question,
                                                final_list=final_list,
@@ -71,13 +71,13 @@ class CliCommands:
 
         list_min_answer: list[MinimalAnswer] = []
         generator: Pipeline = pipeline('text-generation',
-                                       'Qwen/Qwen3-0.6B')
+                                       'Qwen/Qwen3-0.6B', device=0)
         with open(student_search_results_path, 'r') as f:
             stud_search_res: StudentSearchResults =\
                 StudentSearchResults.model_validate(json.load(f))
             for search in tqdm(stud_search_res.search_results):
                 list_min_answer.append(
-                    get_answer(question=search.question,
+                    get_answer(question=search.question_str,
                                final_list=search.retrieved_sources,
                                generator=generator,
                                id=search.question_id))
