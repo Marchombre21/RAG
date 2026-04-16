@@ -1,7 +1,7 @@
 import os
 import json
 from tqdm import tqdm
-from .errors import ImpossibleStoreError
+from .errors import ImpossibleStoreError, IndexerError
 from ast import parse, FunctionDef, ClassDef, get_source_segment
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 class Indexer(BaseModel):
     __start_id: int = PrivateAttr(0)
     __end_id: int = PrivateAttr(0)
-    __chunk: str = PrivateAttr("")
+    __chunk: str | None = PrivateAttr("")
     __text_splitter: RecursiveCharacterTextSplitter = PrivateAttr()
     chunk_size: int = Field(le=2000)
     __corpus: list[str] = PrivateAttr(default_factory=list)
@@ -52,14 +52,14 @@ class Indexer(BaseModel):
         self.__end_id = new_end
 
     @property
-    def chunk(self) -> str:
+    def chunk(self) -> str | None:
         return self.__chunk
 
     @chunk.setter
-    def chunk(self, new_chunk: str) -> None:
+    def chunk(self, new_chunk: str | None) -> None:
         self.__chunk = new_chunk
 
-    def split_text(self, file_content: str, file: str, end: int):
+    def split_text(self, file_content: str, file: str, end: int) -> None:
         text_to_split: str = file_content[self.start_id:end]
         texts: list[Document] = self.text_splitter.\
             create_documents([text_to_split])
@@ -92,6 +92,8 @@ class Indexer(BaseModel):
                                       self.chunk)
                         curr_search_index = self.end_id
                     self.chunk = get_source_segment(file_content, node)
+                    if self.chunk is None:
+                        raise IndexerError()
                     self.start_id = file_content.find(self.chunk,
                                                       curr_search_index)
                     self.end_id = self.start_id + len(self.chunk)
@@ -104,7 +106,10 @@ class Indexer(BaseModel):
                     self.chunk = ''
 
                 else:
-                    text_to_add: str = get_source_segment(file_content, node)
+                    text_to_add: str | None = get_source_segment(
+                        file_content, node)
+                    if text_to_add is None:
+                        raise IndexerError()
                     node_start_id: int = file_content.find(
                         text_to_add, curr_search_index)
                     node_end_id: int = node_start_id + len(text_to_add)
@@ -133,7 +138,7 @@ class Indexer(BaseModel):
             self.split_text(file_content, file, len(file_content))
 
     def add_meta(self, file_path: str, first_char: int, last_char: int,
-                 text: str):
+                 text: str) -> None:
         self.metadatas_chunks.append(
             MinimalSource(file_path=file_path,
                           first_character_index=first_char,
@@ -150,7 +155,8 @@ class Indexer(BaseModel):
         if file_counter == 0:
             raise ImpossibleStoreError()
         for root, _, files in tqdm(os.walk("data/raw/"),
-                                   total=file_counter, unit='files'):
+                                   total=file_counter,
+                                   unit='files'):
             for file in files:
                 if (file.endswith(".py") or file.endswith(".md")
                         or file.endswith(".txt")):
@@ -168,7 +174,7 @@ class Indexer(BaseModel):
                                           len(file_content) - 1, file_content)
                     self.start_id = 0
 
-    def store(self):
+    def store(self) -> None:
         final_array: list[dict[str, int | str]] =\
             [chunk.model_dump() for chunk in self.metadatas_chunks]
         os.makedirs('data/processed/chunks/', exist_ok=True)

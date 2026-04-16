@@ -21,26 +21,27 @@ def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
 
 
 def write_output_search(min_search_res: list[MinimalSearchResults],
-                        save_directory: str, k: int) -> None:
+                        save_directory: str, file_name: str, k: int) -> None:
 
     stud_search_res: StudentSearchResults = StudentSearchResults(
         search_results=min_search_res, k=k)
     os.makedirs(save_directory, exist_ok=True)
-    with open(save_directory + '/dataset_docs_public.json', 'w') as f:
+    with open(save_directory + '/' + file_name, 'w') as f:
         f.write(stud_search_res.model_dump_json(indent=2))
-    print(f"Saved student_search_results to {save_directory}/"
-          "dataset_docs_public.json")
+    print(
+        f"Saved student_search_results to {save_directory + '/' + file_name}")
 
 
 def write_output_answer(min_answer: list[MinimalAnswer], save_directory: str,
-                        k: int) -> None:
+                        file_name: str, k: int) -> None:
 
     stud_answer: StudentSearchResultsAndAnswer =\
             StudentSearchResultsAndAnswer(
                 search_results=min_answer, k=k)
     os.makedirs(save_directory, exist_ok=True)
-    with open(save_directory + '/dataset_docs_public.json', 'w') as f:
+    with open(save_directory + file_name, 'w') as f:
         f.write(stud_answer.model_dump_json(indent=2))
+    print(f'Saved answers in {save_directory + file_name}')
 
 
 def get_min_source(
@@ -81,7 +82,7 @@ def get_search_res(question: str,
 def get_answer(question: str,
                final_list: list[MinimalSource],
                id: str = 'q1') -> MinimalAnswer:
-    context: str = '\n'.join([min_src.chunk for min_src in final_list])
+    context: str = '\n'.join([min_src.chunk for min_src in final_list[:5]])
 
     messages = [{
         "role":
@@ -105,10 +106,15 @@ def get_answer(question: str,
                                       'temperature': 0.0
                                   })
 
-    min_answer: MinimalAnswer = MinimalAnswer(
-        question_id=id,
-        question_str=question,
-        retrieved_sources=final_list,
-        answer=response.message.content.split('</think>')[-1].strip())
+    if response.message.content:
+        message: str = response.message.content.split('</think>')[-1].split(
+            '**Answer**:')[-1].strip()
+    else:
+        message = 'No answer'
+
+    min_answer: MinimalAnswer = MinimalAnswer(question_id=id,
+                                              question_str=question,
+                                              retrieved_sources=final_list,
+                                              answer=message)
 
     return min_answer
