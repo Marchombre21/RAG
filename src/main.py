@@ -77,14 +77,15 @@ class CliCommands:
 
         cache_file: dict[str, Any] = get_cache()
 
-        min_answer: MinimalAnswer | None = check_cache(question, cache_file, k)
+        min_answer: MinimalAnswer | None = check_cache(question, cache_file,
+                                                       str(k))
 
         if not min_answer:
             final_list: list[MinimalSource] = get_min_source(
                 pack_datas=get_retriever(), question=question, k=k)
 
             min_answer = get_answer(question=question, final_list=final_list)
-            cache_file[f'{question.lower()}_{k}'] = {
+            cache_file[f'{question.lower()}_{str(k)}'] = {
                 'retrieved_sources': [src.model_dump() for src in final_list],
                 'answer': min_answer.answer
             }
@@ -113,8 +114,8 @@ class CliCommands:
                 for search in tqdm(stud_search_res.search_results):
 
                     min_answer: MinimalAnswer | None = check_cache(
-                        search.question_str, cache_file, stud_search_res.k,
-                        search.question_id)
+                        search.question_str, cache_file,
+                        str(stud_search_res.k), search.question_id)
 
                     if not min_answer:
 
@@ -125,16 +126,15 @@ class CliCommands:
 
                         list_min_answer.append(min_answer)
 
-                        cache_file[
-                            f'{search.question_str.lower()}_'
-                            f'{stud_search_res.k}'] = {
-                                'retrieved_sources': [
-                                    src.model_dump()
-                                    for src in min_answer.retrieved_sources
-                                ],
-                                'answer':
-                                min_answer.answer
-                            }
+                        cache_file[f'{search.question_str.lower()}_'
+                                   f'{str(stud_search_res.k)}'] = {
+                                       'retrieved_sources': [
+                                           src.model_dump() for src in
+                                           min_answer.retrieved_sources
+                                       ],
+                                       'answer':
+                                       min_answer.answer
+                                   }
                     else:
                         list_min_answer.append(min_answer)
 
