@@ -8,6 +8,7 @@ help:
 	@echo "  make install     - Install dependencies"
 	@echo "  make run         - Run the application"
 	@echo "  make clean       - Clean temporary files"
+	@echo "  make clean-cache - Remove cache file"
 	@echo "  make clean-all   - Remove the virtual environment"
 	@echo "  make debug       - Run the application in debug mode"
 	@echo "  make lint        - Run linters and type checkers"
@@ -24,8 +25,11 @@ debug:
 
 clean:
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@ind . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete
+
+clean-cache:
+	@find . -type f -name "cache.json" -delete
 
 serve:
 	@pgrep -x "ollama" > /dev/null || nohup ollama serve > /dev/null 2>&1 &
@@ -46,4 +50,4 @@ lint-strict:
 	@$(UV) run $(PYTHON) -m flake8 src/*.py src/classes/*.py
 	@$(UV) run $(PYTHON) -m mypy src/*.py src/classes/*.py --strict
 
-.PHONY: help install clean-all run clean debug lint lint-strict serve
+.PHONY: help install clean-all run clean debug lint lint-strict serve clean-cache

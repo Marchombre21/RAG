@@ -11,8 +11,13 @@ from .classes import (MinimalAnswer, RetrieveError, MinimalSearchResults,
 
 
 def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
+    """This function instantiates a BM25 object that will have loaded the
+    indexes saved during data indexing. Then I retrieve the chunks in a python
+    object and return both.
+    """
+
     try:
-        retriever = BM25.load('data/processed/bm25_index/')
+        retriever: BM25 = BM25.load('data/processed/bm25_index/')
         metadatas_chunks: list[dict[str, int | str]]
 
         with open('data/processed/chunks/chunks.json') as f:
@@ -24,6 +29,13 @@ def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
 
 def write_output_search(min_search_res: list[MinimalSearchResults],
                         save_directory: str, file_name: str, k: int) -> None:
+    """I instantiate a StudentSearchResults object and save it to a JSON file
+
+    Args:
+        min_search_res (list[MinimalSearchResults]): All chunks usefull to
+        find the answer
+        k (int): The number of chunks we kept
+    """
 
     stud_search_res: StudentSearchResults = StudentSearchResults(
         search_results=min_search_res, k=k)

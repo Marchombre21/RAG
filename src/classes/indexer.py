@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 
 class Indexer(BaseModel):
+    """This class handle the split into chunks
+    """
     __start_id: int = PrivateAttr(0)
     __end_id: int = PrivateAttr(0)
     __chunk: str | None = PrivateAttr("")
@@ -20,8 +22,9 @@ class Indexer(BaseModel):
         PrivateAttr(default_factory=list)
 
     def init_splitter(self) -> None:
+        overlap_size: int = int(self.chunk_size * 0.1)
         self.__text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size)
+            chunk_size=self.chunk_size, chunk_overlap=overlap_size)
 
     @property
     def text_splitter(self) -> RecursiveCharacterTextSplitter:
@@ -60,6 +63,15 @@ class Indexer(BaseModel):
         self.__chunk = new_chunk
 
     def split_text(self, file_content: str, file: str, end: int) -> None:
+        """Split the text with RecursiveCharacterTextSplitter class from
+        langchain librairie
+
+        Args:
+            file_content (str): The file content
+            file (str): The file path
+            end (int): The last index of the part of text we want to truncate
+        """
+
         text_to_split: str = file_content[self.start_id:end]
         texts: list[Document] = self.text_splitter.\
             create_documents([text_to_split])
@@ -82,9 +94,14 @@ class Indexer(BaseModel):
             self.chunk = ''
             self.start_id = 0
             self.end_id = 0
+
+            # Parse function split all file content into nodes which represents
+            # all logical parts of file (classes, functions, commentaries,
+            # etc...)
             file_tree = parse(file_content)
             curr_search_index: int = 0
             for i, node in enumerate(file_tree.body):
+
                 if isinstance(node, ClassDef) or isinstance(node, FunctionDef):
 
                     if self.chunk:
@@ -106,19 +123,33 @@ class Indexer(BaseModel):
                     self.chunk = ''
 
                 else:
+
+                    # I retrieve the text that makes up the node
                     text_to_add: str | None = get_source_segment(
                         file_content, node)
                     if text_to_add is None:
                         raise IndexerError()
+
+                    # I retrieve the index of the first and last characters of
+                    # the text to be stored
                     node_start_id: int = file_content.find(
                         text_to_add, curr_search_index)
                     node_end_id: int = node_start_id + len(text_to_add)
+
+                    # If there is already text to be stored and adding this
+                    # text would cause the chunk to exceed its maximum size, I
+                    # store the text that has already been saved and clear the
+                    # self.chunk
                     if self.chunk and (node_end_id - self.start_id)\
                             > self.chunk_size:
                         self.add_meta(file, self.start_id, self.end_id - 1,
                                       self.chunk)
                         curr_search_index = self.start_id + len(self.chunk)
                         self.chunk = ''
+
+                    # If this text is the first in the sequence, I set
+                    # `start_id` to the index of the first character in this
+                    # text.
                     if not self.chunk:
                         self.start_id = node_start_id
                     self.end_id = node_end_id
@@ -139,6 +170,8 @@ class Indexer(BaseModel):
 
     def add_meta(self, file_path: str, first_char: int, last_char: int,
                  text: str) -> None:
+        """Adds the chunk to the metadata that will be stored and used later
+        """
         self.metadatas_chunks.append(
             MinimalSource(file_path=file_path,
                           first_character_index=first_char,
@@ -175,6 +208,8 @@ class Indexer(BaseModel):
                     self.start_id = 0
 
     def store(self) -> None:
+        """Store all metadatas in a file in chunks directory
+        """
         final_array: list[dict[str, int | str]] =\
             [chunk.model_dump() for chunk in self.metadatas_chunks]
         os.makedirs('data/processed/chunks/', exist_ok=True)

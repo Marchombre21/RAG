@@ -4,7 +4,6 @@ import os
 import fire
 from typing import Any
 from tqdm import tqdm
-from time import time
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from src.classes.errors import RagError
@@ -39,7 +38,7 @@ class CliCommands:
             question, k, get_retriever())
 
         write_output_search([min_search_res], save_directory,
-                            question + '.json', k)
+                            'single_search.json', k)
 
     @staticmethod
     def search_dataset(dataset_path: str, k: int, save_directory: str)\
@@ -70,10 +69,7 @@ class CliCommands:
 
     @staticmethod
     def answer(question: str,
-               k: int = 10,
-               save_directory: str = 'data/output/answer_results') -> None:
-
-        start: float = time()
+               k: int = 10) -> None:
 
         cache_file: dict[str, Any] = get_cache()
 
@@ -91,9 +87,7 @@ class CliCommands:
             }
             with open('data/cache/cache.json', 'w') as f:
                 json.dump(cache_file, f, indent=2)
-        end: float = time()
-        print('Temps de traitement: ', end - start)
-        write_output_answer([min_answer], save_directory,
+        write_output_answer([min_answer], 'data/output/answer_results',
                             '/single_answer.json', k)
 
     @staticmethod
@@ -156,7 +150,7 @@ class CliCommands:
                  k: int = 10,
                  max_context_length: int = 2000) -> None:
         os.system(
-            "./src/moulinette-ubuntu evaluate_student_search_results"
+            "./moulinette-ubuntu evaluate_student_search_results"
             f" --student_answer_path {student_answer_path}"
             f" --dataset_path {dataset_path} --k {k} --max_context_length"
             f" {max_context_length}")

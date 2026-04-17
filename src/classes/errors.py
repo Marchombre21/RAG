@@ -24,7 +24,7 @@ class ImpossibleStoreError(Exception):
 class IndexerError(Exception):
 
     def __init__(self) -> None:
-        message: str = '\nERROR:\nAn error occurs during indexation. Please'\
+        message: str = '\nERROR:\nAn error occurs during indexing. Please'\
             'retry later.'
         super().__init__(message)
 
