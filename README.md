@@ -36,6 +36,8 @@ connection.
 
 You have to execute the ```make install``` command. It will installs all the required dependancies for this program in a virtual environment.
 
+If you run the ```make run``` command directly, it will automatically execute the ```make install``` command and launch the program once the dependencies have been installed.
+
 ### Execution
 
 The source code is provided with a Makefile containing the following rules:

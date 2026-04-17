@@ -124,8 +124,8 @@ def get_answer(question: str,
 
 def check_cache(question: str,
                 cache_file: dict[str, Any],
-                k: int = 10,
-                id: int = 'q1') -> MinimalAnswer | None:
+                k: str = '10',
+                id: str = 'q1') -> MinimalAnswer | None:
 
     key_str: str = f'{question.lower()}_{k}'
     if key_str in cache_file:
@@ -145,7 +145,7 @@ def check_cache(question: str,
 
 def get_cache() -> dict[str, Any]:
     if not os.path.exists('data/cache/cache.json'):
-        os.makedirs('data/cache/')
+        os.makedirs('data/cache/', exist_ok=True)
         with open('data/cache/cache.json', 'w') as f:
             f.write("{}")
 
