@@ -4,6 +4,7 @@ import os
 import fire
 from typing import Any
 from tqdm import tqdm
+from time import time
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from src.classes.errors import RagError
@@ -11,8 +12,9 @@ from bm25s import BM25
 from src.classes import (FilePathError, AnsweredQuestion, StudentSearchResults,
                          RagDataset, MinimalSource, MinimalSearchResults,
                          MinimalAnswer, Indexer)
-from .utils import (get_answer, get_min_source, get_retriever,
-                    write_output_answer, write_output_search, get_search_res)
+from .utils import (get_answer, check_cache, get_cache, get_min_source,
+                    get_retriever, write_output_answer, write_output_search,
+                    get_search_res)
 
 
 class CliCommands:
@@ -71,12 +73,25 @@ class CliCommands:
                k: int = 10,
                save_directory: str = 'data/output/answer_results') -> None:
 
-        final_list: list[MinimalSource] = get_min_source(
-            pack_datas=get_retriever(), question=question, k=k)
+        start: float = time()
 
-        min_answer: MinimalAnswer = get_answer(question=question,
-                                               final_list=final_list)
+        cache_file: dict[str, Any] = get_cache()
 
+        min_answer: MinimalAnswer | None = check_cache(question, cache_file, k)
+
+        if not min_answer:
+            final_list: list[MinimalSource] = get_min_source(
+                pack_datas=get_retriever(), question=question, k=k)
+
+            min_answer = get_answer(question=question, final_list=final_list)
+            cache_file[f'{question.lower()}_{k}'] = {
+                'retrieved_sources': [src.model_dump() for src in final_list],
+                'answer': min_answer.answer
+            }
+            with open('data/cache/cache.json', 'w') as f:
+                json.dump(cache_file, f, indent=2)
+        end: float = time()
+        print('Temps de traitement: ', end - start)
         write_output_answer([min_answer], save_directory,
                             '/single_answer.json', k)
 
@@ -85,6 +100,9 @@ class CliCommands:
                        save_directory: str) -> None:
 
         list_min_answer: list[MinimalAnswer] = []
+
+        cache_file: dict[str, Any] = get_cache()
+
         try:
             with open(student_search_results_path, 'r') as f:
                 stud_search_res: StudentSearchResults =\
@@ -93,11 +111,36 @@ class CliCommands:
                 print(f'Loaded {size_list} questions'
                       f' from {student_search_results_path}')
                 for search in tqdm(stud_search_res.search_results):
-                    list_min_answer.append(
-                        get_answer(question=search.question_str,
-                                   final_list=search.retrieved_sources,
-                                   id=search.question_id))
+
+                    k: int = len(search.retrieved_sources)
+                    min_answer: MinimalAnswer | None = check_cache(
+                        search.question_str, cache_file, k, search.question_id)
+
+                    if not min_answer:
+
+                        min_answer = get_answer(
+                            question=search.question_str,
+                            final_list=search.retrieved_sources,
+                            id=search.question_id)
+
+                        list_min_answer.append(min_answer)
+
+                        cache_file[f'{search.question_str.lower()}_{k}'] = {
+                            'retrieved_sources': [
+                                src.model_dump()
+                                for src in min_answer.retrieved_sources
+                            ],
+                            'answer':
+                            min_answer.answer
+                        }
+                    else:
+                        list_min_answer.append(min_answer)
+
                 print(f'Processed {size_list} of {size_list} questions.')
+
+                with open('data/cache/cache.json', 'w') as f:
+                    json.dump(cache_file, f, indent=2)
+
         except FileNotFoundError:
             raise FilePathError(student_search_results_path)
 
@@ -118,12 +161,12 @@ class CliCommands:
 
 
 if __name__ == "__main__":
-    try:
-        fire.Fire(CliCommands)
-    except ValidationError as e:
-        errors: list[ErrorDetails] = e.errors()
-        for error in errors:
-            print(f'A Pydantic error of type {error["type"]} occurs.'
-                  f' {error["msg"]} in {error["loc"][-1]} attribut.')
-    except Exception as e:
-        print(e)
+    # try:
+    fire.Fire(CliCommands)
+# except ValidationError as e:
+#     errors: list[ErrorDetails] = e.errors()
+#     for error in errors:
+#         print(f'A Pydantic error of type {error["type"]} occurs.'
+#               f' {error["msg"]} in {error["loc"][-1]} attribut.')
+# except Exception as e:
+#     print(e)

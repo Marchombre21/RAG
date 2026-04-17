@@ -1,6 +1,8 @@
 import bm25s
 import os
 import json
+from json import JSONDecodeError
+from typing import Any
 from ollama import chat, ChatResponse
 from bm25s import BM25
 from .classes import (MinimalAnswer, RetrieveError, MinimalSearchResults,
@@ -118,3 +120,40 @@ def get_answer(question: str,
                                               answer=message)
 
     return min_answer
+
+
+def check_cache(question: str,
+                cache_file: dict[str, Any],
+                k: int = 10,
+                id: int = 'q1') -> MinimalAnswer | None:
+
+    key_str: str = f'{question.lower()}_{k}'
+    if key_str in cache_file:
+        response: dict[str, Any] = cache_file[key_str]
+        min_answer: MinimalAnswer = MinimalAnswer(
+            question_id=id,
+            question_str=question,
+            retrieved_sources=[
+                MinimalSource.model_validate(src)
+                for src in response['retrieved_sources']
+            ],
+            answer=response['answer'])
+        return min_answer
+    else:
+        return None
+
+
+def get_cache() -> dict[str, Any]:
+    if not os.path.exists('data/cache/cache.json'):
+        os.makedirs('data/cache/')
+        with open('data/cache/cache.json', 'w') as f:
+            f.write("{}")
+
+    with open('data/cache/cache.json', 'r') as f:
+        try:
+            cache_file: dict[str, Any] = json.load(f)
+        except JSONDecodeError:
+            print('The cache was cleared after an error was detected inside'
+                  ' it.')
+            cache_file = {}
+    return cache_file
