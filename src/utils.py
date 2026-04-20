@@ -96,7 +96,7 @@ def get_search_res(question: str,
 def get_answer(question: str,
                final_list: list[MinimalSource],
                id: str = 'q1') -> MinimalAnswer:
-    context: str = '\n'.join([min_src.chunk for min_src in final_list[:5]])
+    context: str = '\n'.join([min_src.chunk for min_src in final_list])
 
     messages = [{
         "role":
@@ -122,7 +122,7 @@ def get_answer(question: str,
 
     if response.message.content:
         message: str = response.message.content.split('</think>')[-1].split(
-            '**Answer**:')[-1].strip()
+            '**Answer**')[-1].strip()
     else:
         message = 'No answer'
 

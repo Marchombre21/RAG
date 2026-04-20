@@ -68,8 +68,7 @@ class CliCommands:
         write_output_search(list_min_search, save_directory, file_name, k)
 
     @staticmethod
-    def answer(question: str,
-               k: int = 10) -> None:
+    def answer(question: str, k: int = 10) -> None:
 
         cache_file: dict[str, Any] = get_cache()
 
@@ -145,15 +144,23 @@ class CliCommands:
                             stud_search_res.k)
 
     @staticmethod
-    def evaluate(student_answer_path: str,
-                 dataset_path: str,
+    def evaluate(command: str,
+                 student_answer_path: str,
+                 dataset_path: str = "",
                  k: int = 10,
-                 max_context_length: int = 2000) -> None:
-        os.system(
-            "./moulinette-ubuntu evaluate_student_search_results"
-            f" --student_answer_path {student_answer_path}"
-            f" --dataset_path {dataset_path} --k {k} --max_context_length"
-            f" {max_context_length}")
+                 max_context: int = 2000) -> None:
+        if command == "search":
+            os.system(
+                f'./src/moulinette-ubuntu evaluate_student_search_results'
+                f' {student_answer_path} {dataset_path} {k} {max_context}'
+            )
+        elif command == "list":
+            os.system(
+                f"./src/moulinette-ubuntu list_valid_questions"
+                f" {student_answer_path} {dataset_path} {k}"
+            )
+        else:
+            print("Invalid command. Options: search, list")
 
 
 if __name__ == "__main__":
