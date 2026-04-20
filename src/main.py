@@ -38,7 +38,7 @@ class CliCommands:
             question, k, get_retriever())
 
         write_output_search([min_search_res], save_directory,
-                            'single_search.json', k)
+                            '/single_search.json', k)
 
     @staticmethod
     def search_dataset(dataset_path: str, k: int, save_directory: str)\

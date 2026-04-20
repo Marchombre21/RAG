@@ -28,7 +28,9 @@ def get_retriever() -> tuple[BM25, list[dict[str, int | str]]]:
 
 
 def write_output_search(min_search_res: list[MinimalSearchResults],
-                        save_directory: str, file_name: str, k: int) -> None:
+                        save_directory: str,
+                        file_name: str,
+                        k: int) -> None:
     """I instantiate a StudentSearchResults object and save it to a JSON file
 
     Args:
@@ -36,14 +38,15 @@ def write_output_search(min_search_res: list[MinimalSearchResults],
         find the answer
         k (int): The number of chunks we kept
     """
-
+    if not save_directory.endswith('/') and not file_name.startswith('/'):
+        file_name = '/' + file_name
     stud_search_res: StudentSearchResults = StudentSearchResults(
         search_results=min_search_res, k=k)
     os.makedirs(save_directory, exist_ok=True)
-    with open(save_directory + '/' + file_name, 'w') as f:
+    with open(save_directory + file_name, 'w') as f:
         f.write(stud_search_res.model_dump_json(indent=2))
     print(
-        f"Saved student_search_results to {save_directory + '/' + file_name}")
+        f"Saved student_search_results to {save_directory + file_name}")
 
 
 def write_output_answer(min_answer: list[MinimalAnswer], save_directory: str,
