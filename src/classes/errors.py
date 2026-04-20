@@ -34,3 +34,11 @@ class RagError(Exception):
     def __init__(self) -> None:
         message: str = '\nERROR:\nNo Rag_questions key in JSON file.'
         super().__init__(message)
+
+
+class MoulinetteError(Exception):
+
+    def __init__(self) -> None:
+        message: str = '\nERROR:\nThe moulinette caught an error. Read the'\
+            ' error messages for more informations'
+        super().__init__(message)

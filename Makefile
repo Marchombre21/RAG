@@ -19,8 +19,8 @@ install:
 
 run: serve
 ifndef ARGS
-	@echo "Erreur de syntaxe. Utilisation : make run ARGS=\"<commande> [options]\""
-	@echo "Commandes disponibles : index, search, search_dataset, answer, answer_dataset, evaluate"
+	@echo "Syntax error. Usage : make run ARGS=\"<commande> [options]\""
+	@echo "Available commands : index, search, search_dataset, answer, answer_dataset, evaluate"
 	@exit 1
 endif
 	@$(UV) run $(PYTHON) -m $(SRC).$(PROG) $(ARGS)

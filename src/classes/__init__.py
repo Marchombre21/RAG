@@ -9,11 +9,12 @@ from .min_search import (
 from .mininal_source import MinimalSource
 from .rag_model import RagDataset
 from .indexer import Indexer
-from .errors import FilePathError, RetrieveError
+from .errors import FilePathError, RetrieveError, MoulinetteError
 from .questions_model import UnansweredQuestion, AnsweredQuestion
 
 __all__ = [
     'RetrieveError',
+    'MoulinetteError',
     'StudentSearchResults',
     'FilePathError',
     'StudentSearchResultsAndAnswer',

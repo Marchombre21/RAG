@@ -8,9 +8,9 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from src.classes.errors import RagError
 from bm25s import BM25
-from src.classes import (FilePathError, AnsweredQuestion, StudentSearchResults,
-                         RagDataset, MinimalSource, MinimalSearchResults,
-                         MinimalAnswer, Indexer)
+from src.classes import (FilePathError, MoulinetteError, AnsweredQuestion,
+                         StudentSearchResults, RagDataset, MinimalSource,
+                         MinimalSearchResults, MinimalAnswer, Indexer)
 from .utils import (get_answer, check_cache, get_cache, get_min_source,
                     get_retriever, write_output_answer, write_output_search,
                     get_search_res)
@@ -146,21 +146,31 @@ class CliCommands:
     @staticmethod
     def evaluate(command: str,
                  student_answer_path: str,
-                 dataset_path: str = "",
+                 dataset_path: str,
                  k: int = 10,
                  max_context: int = 2000) -> None:
+
+        if not os.path.exists(student_answer_path):
+            raise FileNotFoundError(
+                "Le fichier de résultats étudiant est introuvable :"
+                f" {student_answer_path}")
+
+        if not os.path.exists(dataset_path):
+            raise FileNotFoundError(
+                f"Le fichier de dataset est introuvable : {dataset_path}")
+
+        result: int = 0
         if command == "search":
-            os.system(
+            result = os.system(
                 f'./src/moulinette-ubuntu evaluate_student_search_results'
-                f' {student_answer_path} {dataset_path} {k} {max_context}'
-            )
+                f' {student_answer_path} {dataset_path} {k} {max_context}')
         elif command == "list":
-            os.system(
-                f"./src/moulinette-ubuntu list_valid_questions"
-                f" {student_answer_path} {dataset_path} {k}"
-            )
+            result = os.system(f"./src/moulinette-ubuntu list_valid_questions"
+                               f" {student_answer_path} {dataset_path} {k}")
         else:
             print("Invalid command. Options: search, list")
+        if result != 0:
+            raise MoulinetteError()
 
 
 if __name__ == "__main__":
